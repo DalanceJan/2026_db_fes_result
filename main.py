@@ -184,46 +184,103 @@ def parse_report_to_metadata(html_content):
     }
 def generate_combined_html(all_matches_metadata, max_teams=4):
     """
-    將所有場次的 Meta Data 重新排列，並合併輸出成一個 HTML 表格
+    將所有場次的 Meta Data 重新排列，並合併輸出成一個可排序、可篩選的 HTML 頁面
     """
-    html = []
-    html.append("<table border='1' style='border-collapse: collapse; text-align: center;'>")
-    
-    # 建立動態表頭
     header = ["場次", "時間", "項目"]
     for i in range(1, max_teams + 1):
         header.extend([f"名次{i}", f"名次{i}隊伍", f"時間", f"名次{i}水道"])
-    
-    html.append("  <tr>")
-    for h in header:
-        html.append(f"    <th style='padding: 8px; background-color: #f2f2f2;'>{h}</th>")
-    html.append("  </tr>")
-    
-    # 填入每場賽事資料
+
+    html = []
+    html.append("<!DOCTYPE html>")
+    html.append("<html lang='zh-Hant'>")
+    html.append("<head>")
+    html.append("  <meta charset='utf-8'>")
+    html.append("  <meta name='viewport' content='width=device-width, initial-scale=1'>")
+    html.append("  <title>龍舟成績彙整</title>")
+    html.append("  <style>")
+    html.append("    body { font-family: Arial, sans-serif; padding: 16px; }")
+    html.append("    table { border-collapse: collapse; width: 100%; max-width: 100%; }")
+    html.append("    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }")
+    html.append("    th { background-color: #f2f2f2; cursor: pointer; position: relative; }")
+    html.append("    th:hover { background-color: #e0e0e0; }")
+    html.append("    th::after { content: '\\2195'; font-size: 0.8em; color: #666; position: absolute; right: 8px; }")
+    html.append("    input#filterInput { padding: 8px; width: 320px; max-width: 100%; margin-right: 8px; }")
+    html.append("    .controls { margin-bottom: 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }")
+    html.append("    .controls label { font-weight: bold; }")
+    html.append("  </style>")
+    html.append("</head>")
+    html.append("<body>")
+    html.append("  <h1>龍舟成績彙整</h1>")
+    html.append("  <div class='controls'>")
+    html.append("    <label for='filterInput'>快速篩選：</label>")
+    html.append("    <input id='filterInput' type='text' placeholder='輸入關鍵字過濾整張表格，例如：男子' oninput='filterTable()'>")
+    html.append("    <span>點擊欄位名稱可排序，輸入文字可即時篩選含有該文字的列。</span>")
+    html.append("  </div>")
+    html.append("  <table id='combinedTable'>")
+    html.append("    <thead>")
+    html.append("      <tr>")
+    for idx, h in enumerate(header):
+        html.append(f"        <th onclick='sortTable({idx})'>{h}</th>")
+    html.append("      </tr>")
+    html.append("    </thead>")
+    html.append("    <tbody>")
+
     for match in all_matches_metadata:
-        html.append("  <tr>")
-        html.append(f"    <td>{match['match_no']}</td>")
-        html.append(f"    <td>{match['time']}</td>")
-        html.append(f"    <td>{match['item']}</td>")
-        
-        # 填入各名次隊伍
+        html.append("      <tr>")
+        html.append(f"        <td>{match['match_no']}</td>")
+        html.append(f"        <td>{match['time']}</td>")
+        html.append(f"        <td>{match['item']}</td>")
+
         for i in range(max_teams):
             if i < len(match['results']):
                 t = match['results'][i]
                 rank_str = f"第{t['rank']}名" if t['rank'] != 999 else "未完賽"
                 html.extend([
-                    f"    <td>{rank_str}</td>",
-                    f"    <td>{t['team_name']}</td>",
-                    f"    <td>{t['result_time']}</td>",
-                    f"    <td>{t['lane']}</td>"
+                    f"        <td>{rank_str}</td>",
+                    f"        <td>{t['team_name']}</td>",
+                    f"        <td>{t['result_time']}</td>",
+                    f"        <td>{t['lane']}</td>"
                 ])
             else:
-                # 若該場次隊伍不足 max_teams，補空欄
-                html.extend(["    <td>-</td>", "    <td>-</td>", "    <td>-</td>", "    <td>-</td>"])
-        
-        html.append("  </tr>")
-        
-    html.append("</table>")
+                html.extend([
+                    "        <td>-</td>", "        <td>-</td>", "        <td>-</td>", "        <td>-</td>"])
+        html.append("      </tr>")
+
+    html.append("    </tbody>")
+    html.append("  </table>")
+    html.append("  <script>")
+    html.append("    const sortDirections = {};")
+    html.append("    function sortTable(columnIndex) {")
+    html.append("      const table = document.getElementById('combinedTable');")
+    html.append("      const tbody = table.tBodies[0];")
+    html.append("      const rows = Array.from(tbody.querySelectorAll('tr'));")
+    html.append("      const direction = sortDirections[columnIndex] === 'asc' ? 'desc' : 'asc';")
+    html.append("      sortDirections[columnIndex] = direction;")
+    html.append("      const compare = (a, b) => {")
+    html.append("        const cellA = a.children[columnIndex].innerText.trim();")
+    html.append("        const cellB = b.children[columnIndex].innerText.trim();")
+    html.append("        const numA = parseFloat(cellA.replace(/[^0-9.]/g, ''));")
+    html.append("        const numB = parseFloat(cellB.replace(/[^0-9.]/g, ''));")
+    html.append("        if (!isNaN(numA) && !isNaN(numB) && cellA !== '' && cellB !== '') {")
+    html.append("          return direction === 'asc' ? numA - numB : numB - numA;")
+    html.append("        }")
+    html.append("        return direction === 'asc' ? cellA.localeCompare(cellB, 'zh-Hant', { numeric: true }) : cellB.localeCompare(cellA, 'zh-Hant', { numeric: true });")
+    html.append("      };")
+    html.append("      rows.sort(compare);")
+    html.append("      rows.forEach(row => tbody.appendChild(row));")
+    html.append("    }")
+    html.append("    function filterTable() {")
+    html.append("      const filterValue = document.getElementById('filterInput').value.trim().toLowerCase();")
+    html.append("      const table = document.getElementById('combinedTable');")
+    html.append("      const rows = table.tBodies[0].rows;")
+    html.append("      for (const row of rows) {")
+    html.append("        const text = row.innerText.toLowerCase();")
+    html.append("        row.style.display = text.includes(filterValue) ? '' : 'none';")
+    html.append("      }")
+    html.append("    }")
+    html.append("  </script>")
+    html.append("</body>")
+    html.append("</html>")
     return "\n".join(html)
 
 # === 實際執行示範 ===

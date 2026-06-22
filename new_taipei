@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>龍舟比賽數據查看器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            padding: 30px;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            text-align: center;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .search-box {
+            flex: 1;
+            min-width: 250px;
+        }
+        
+        .search-box label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #333;
+            font-size: 14px;
+        }
+        
+        .search-box input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        .search-box input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .stats {
+            display: flex;
+            gap: 15px;
+        }
+        
+        .stat-item {
+            background: #f0f4ff;
+            padding: 12px 20px;
+            border-radius: 6px;
+            text-align: center;
+            min-width: 120px;
+        }
+        
+        .stat-item .label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .stat-item .value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .table-wrapper {
+            overflow-x: auto;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+        
+        thead {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        
+        th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 13px;
+            white-space: nowrap;
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.2s;
+            position: relative;
+        }
+        
+        th:hover {
+            background: rgba(0, 0, 0, 0.1);
+        }
+        
+        th::after {
+            content: " ⇅";
+            font-size: 11px;
+            opacity: 0.5;
+            margin-left: 5px;
+        }
+        
+        th.sorted-asc::after {
+            content: " ↑";
+            opacity: 1;
+            color: #ffff00;
+        }
+        
+        th.sorted-desc::after {
+            content: " ↓";
+            opacity: 1;
+            color: #ffff00;
+        }
+        
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #eee;
+            font-size: 13px;
+        }
+        
+        tbody tr {
+            transition: background-color 0.2s;
+        }
+        
+        tbody tr:hover {
+            background-color: #f9f9ff;
+        }
+        
+        tbody tr:nth-child(even) {
+            background-color: #f5f5f5;
+        }
+        
+        tbody tr.highlight {
+            background-color: #fff3cd;
+            font-weight: 500;
+        }
+        
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+            font-size: 16px;
+        }
+        
+        .time-cell {
+            background-color: #e8f4f8;
+            font-weight: 500;
+        }
+        
+        .rank-cell {
+            background-color: #fff4e6;
+            font-weight: bold;
+            text-align: center;
+            min-width: 40px;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+            
+            .controls {
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .search-box {
+                min-width: 100%;
+            }
+            
+            .stats {
+                width: 100%;
+                justify-content: space-around;
+            }
+            
+            th, td {
+                padding: 8px 10px;
+                font-size: 12px;
+            }
+            
+            h1 {
+                font-size: 20px;
+            }
+        }
+        
+        .highlight-match {
+            background-color: #ffffcc;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏆 龍舟比賽數據查看器</h1>
+        <p class="subtitle">新北市議長盃龍舟錦標賽成績表</p>
+        
+        <div class="controls">
+            <div class="search-box">
+                <label for="filterInput">🔍 過濾數據 (例如: 男子、女子、龍舟隊)</label>
+                <input 
+                    type="text" 
+                    id="filterInput" 
+                    placeholder="輸入隊伍名稱或其他關鍵詞進行過濾..."
+                    autocomplete="off"
+                >
+            </div>
+            <div class="stats">
+                <div class="stat-item">
+                    <div class="label">總場次</div>
+                    <div class="value" id="totalCount">-</div>
+                </div>
+                <div class="stat-item">
+                    <div class="label">顯示條數</div>
+                    <div class="value" id="showCount">-</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="table-wrapper">
+            <table id="dataTable">
+                <thead>
+                    <tr>
+                        <th onclick="sortTable('Match Index')">場次編號</th>
+                        <th onclick="sortTable('Match Time')">比賽時間</th>
+                        <th onclick="sortTable('Match Set')">分組場次</th>
+                        <th onclick="sortTable('Lane')">水道</th>
+                        <th onclick="sortTable('Team Name')">隊伍名稱</th>
+                        <th onclick="sortTable('Qualifying Score')">預賽成績</th>
+                        <th onclick="sortTable('Match Score')">比賽成績</th>
+                        <th onclick="sortTable('Rank')">名次</th>
+                        <th onclick="sortTable('Match Name')">比賽組別</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                </tbody>
+            </table>
+            <div class="no-data" id="noData" style="display: none;">
+                沒有找到符合條件的數據
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===== 嵌入式JSON數據 =====
+        const allData = [{"Match Index": "28", "Match Time": "08:20", "Match Set": "1 ", "Lane": "1 ", "Team Name": "TAIPEI_U60 ", "Qualifying Score": "2:36.16 ", "Match Score": "2:36.90 ", "Rank": "4 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽小型龍舟男子組半決賽成績表(SF)'"}, {"Match Index": "28", "Match Time": "08:20", "Match Set": "1 ", "Lane": "2 ", "Team Name": "臺北市政府警察局U50 ", "Qualifying Score": "2:30.85 ", "Match Score": "2:31.36 ", "Rank": "2 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽小型龍舟男子組半決賽成績表(SF)'"}, {"Match Index": "28", "Match Time": "08:20", "Match Set": "1 ", "Lane": "3 ", "Team Name": "真理大學 ", "Qualifying Score": "2:28.62 ", "Match Score": "2:28.19 ", "Rank": "1 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽小型龍舟男子組半決賽成績表(SF)'"}, {"Match Index": "28", "Match Time": "08:20", "Match Set": "1 ", "Lane": "4 ", "Team Name": "法巴龍舟隊 ", "Qualifying Score": "2:33.57 ", "Match Score": "2:33.55 ", "Rank": "3 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽小型龍舟男子組半決賽成績表(SF)'"}, {"Match Index": "29", "Match Time": "08:30", "Match Set": "2 ", "Lane": "1 ", "Team Name": "同心小男孩 ", "Qualifying Score": "2:36.74 ", "Match Score": "2:36.10 ", "Rank": "4 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽小型龍舟男子組半決賽成績表(SF)'"}, {"Match Index": "29", "Match Time": "08:30", "Match Set": "2 ", "Lane": "2 ", "Team Name": "新北消防發爾麵 ", "Qualifying Score": "2:30.94 ", "Match Score": "2:32.25 ", "Rank": "3 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽小型龍舟男子組半決賽成績表(SF)'"}, {"Match Index": "29", "Match Time": "08:30", "Match Set": "2 ", "Lane": "3 ", "Team Name": "新北烏來龍舟隊 ", "Qualifying Score": "2:28.61 ", "Match Score": "2:26.74 ", "Rank": "1 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽小型龍舟男子組半決賽成績表(SF)'"}, {"Match Index": "29", "Match Time": "08:30", "Match Set": "2 ", "Lane": "4 ", "Team Name": "SALAMA龍舟隊 ", "Qualifying Score": "2:31.73 ", "Match Score": "2:29.39 ", "Rank": "2 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽小型龍舟男子組半決賽成績表(SF)'"}, {"Match Index": "30", "Match Time": "08:40", "Match Set": "3 ", "Lane": "1 ", "Team Name": "簡單健身 ", "Qualifying Score": "2:38.11 ", "Match Score": "2:34.97 ", "Rank": "3 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽小型龍舟男子組半決賽成績表(SF)'"}, {"Match Index": "30", "Match Time": "08:40", "Match Set": "3 ", "Lane": "2 ", "Team Name": "四季龍 ", "Qualifying Score": "2:31.05 ", "Match Score": "3:02.87 ", "Rank": "4 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽小型龍舟男子組半決賽成績表(SF)'"}, {"Match Index": "30", "Match Time": "08:40", "Match Set": "3 ", "Lane": "3 ", "Team Name": "興隆模板 ", "Qualifying Score": "2:27.53 ", "Match Score": "2:29.89 ", "Rank": "1 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽小型龍舟男子組半決賽成績表(SF)'"}, {"Match Index": "30", "Match Time": "08:40", "Match Set": "3 ", "Lane": "4 ", "Team Name": "Wolf狼族 ", "Qualifying Score": "2:31.64 ", "Match Score": "2:34.31 ", "Rank": "2 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽小型龍舟男子組半決賽成績表(SF)'"}, {"Match Index": "31", "Match Time": "09:00", "Match Set": "1 ", "Lane": "1 ", "Team Name": "RUMA ", "Qualifying Score": "2:27.02 ", "Match Score": "2:25.49 ", "Rank": "3 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟混合組半決賽成績表(SF)'"}, {"Match Index": "31", "Match Time": "09:00", "Match Set": "1 ", "Lane": "2 ", "Team Name": "Black_Tide_黑潮 ", "Qualifying Score": "2:19.24 ", "Match Score": "2:23.86 ", "Rank": "2 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟混合組半決賽成績表(SF)'"}, {"Match Index": "31", "Match Time": "09:00", "Match Set": "1 ", "Lane": "3 ", "Team Name": "TFA黑夜黑GoLiVen ", "Qualifying Score": "2:17.70 ", "Match Score": "2:22.01 ", "Rank": "1 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟混合組半決賽成績表(SF)'"}, {"Match Index": "31", "Match Time": "09:00", "Match Set": "1 ", "Lane": "4 ", "Team Name": "DAKULA ", "Qualifying Score": "2:26.87 ", "Match Score": "2:26.83 ", "Rank": "4 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟混合組半決賽成績表(SF)'"}, {"Match Index": "32", "Match Time": "09:10", "Match Set": "2 ", "Lane": "1 ", "Team Name": "一家人龍舟隊 ", "Qualifying Score": "2:27.32 ", "Match Score": "2:26.20 ", "Rank": "3 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟混合組半決賽成績表(SF)'"}, {"Match Index": "32", "Match Time": "09:10", "Match Set": "2 ", "Lane": "2 ", "Team Name": "宇宙飛船_Rowvolution ", "Qualifying Score": "2:19.86 ", "Match Score": "2:21.24 ", "Rank": "1 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟混合組半決賽成績表(SF)'"}, {"Match Index": "32", "Match Time": "09:10", "Match Set": "2 ", "Lane": "3 ", "Team Name": "德倫思靈感龍 ", "Qualifying Score": "2:17.07 ", "Match Score": "2:22.06 ", "Rank": "2 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟混合組半決賽成績表(SF)'"}, {"Match Index": "32", "Match Time": "09:10", "Match Set": "2 ", "Lane": "4 ", "Team Name": "台日交流龍舟隊 ", "Qualifying Score": "2:26.43 ", "Match Score": "9:99.99 ", "Rank": "5 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟混合組半決賽成績表(SF)'"}, {"Match Index": "33", "Match Time": "09:20", "Match Set": "3 ", "Lane": "1 ", "Team Name": "TSUNAMI ", "Qualifying Score": "2:28.55 ", "Match Score": "2:27.60 ", "Rank": "4 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟混合組半決賽成績表(SF)'"}, {"Match Index": "33", "Match Time": "09:20", "Match Set": "3 ", "Lane": "2 ", "Team Name": "TeamMAX_極限隊 ", "Qualifying Score": "2:21.06 ", "Match Score": "2:22.34 ", "Rank": "3 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟混合組半決賽成績表(SF)'"}, {"Match Index": "33", "Match Time": "09:20", "Match Set": "3 ", "Lane": "3 ", "Team Name": "阿美青年跩根隊 ", "Qualifying Score": "2:15.84 ", "Match Score": "2:14.96 ", "Rank": "1 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟混合組半決賽成績表(SF)'"}, {"Match Index": "33", "Match Time": "09:20", "Match Set": "3 ", "Lane": "4 ", "Team Name": "創友一條龍 ", "Qualifying Score": "2:24.40 ", "Match Score": "2:21.52 ", "Rank": "2 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟混合組半決賽成績表(SF)'"}, {"Match Index": "34", "Match Time": "09:30", "Match Set": "4 ", "Lane": "1 ", "Team Name": "政大EMBA50U ", "Qualifying Score": "2:30.59 ", "Match Score": "2:39.97 ", "Rank": "4 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟混合組半決賽成績表(SF)'"}, {"Match Index": "34", "Match Time": "09:30", "Match Set": "4 ", "Lane": "2 ", "Team Name": "兩成肆就捌 ", "Qualifying Score": "2:22.72 ", "Match Score": "2:24.36 ", "Rank": "1 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟混合組半決賽成績表(SF)'"}, {"Match Index": "34", "Match Time": "09:30", "Match Set": "4 ", "Lane": "3 ", "Team Name": "AMIS_YOUTH ", "Qualifying Score": "2:14.91 ", "Match Score": "2:24.47 ", "Rank": "2 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟混合組半決賽成績表(SF)'"}, {"Match Index": "34", "Match Time": "09:30", "Match Set": "4 ", "Lane": "4 ", "Team Name": "FREEMAN_JOY_POWER ", "Qualifying Score": "2:24.16 ", "Match Score": "2:30.14 ", "Rank": "3 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟混合組半決賽成績表(SF)'"}, {"Match Index": "35", "Match Time": "09:40", "Match Set": "5 ", "Lane": "1 ", "Team Name": "Les_Copains_à_Bord_–_Alstom ", "Qualifying Score": "2:41.79 ", "Match Score": "2:46.71 ", "Rank": "4 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟混合組半決賽成績表(SF)'"}, {"Match Index": "35", "Match Time": "09:40", "Match Set": "5 ", "Lane": "2 ", "Team Name": "TFA白雲白GoLiVent ", "Qualifying Score": "2:22.86 ", "Match Score": "2:23.84 ", "Rank": "3 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟混合組半決賽成績表(SF)'"}, {"Match Index": "35", "Match Time": "09:40", "Match Set": "5 ", "Lane": "3 ", "Team Name": "Mapolong樹豆龍舟隊 ", "Qualifying Score": "2:13.36 ", "Match Score": "2:18.25 ", "Rank": "1 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟混合組半決賽成績表(SF)'"}, {"Match Index": "35", "Match Time": "09:40", "Match Set": "5 ", "Lane": "4 ", "Team Name": "鳳凰水岸龍舟隊 ", "Qualifying Score": "2:23.34 ", "Match Score": "2:20.17 ", "Rank": "2 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟混合組半決賽成績表(SF)'"}, {"Match Index": "36", "Match Time": "09:50", "Match Set": "1 ", "Lane": "1 ", "Team Name": "CiDAL狂潮 ", "Qualifying Score": "2:24.77 ", "Match Score": "2:32.65 ", "Rank": "3 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟男子組半決賽成績表(SF)'"}, {"Match Index": "36", "Match Time": "09:50", "Match Set": "1 ", "Lane": "2 ", "Team Name": "新莊實業熊鷹 ", "Qualifying Score": "2:10.67 ", "Match Score": "2:10.51 ", "Rank": "1 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟男子組半決賽成績表(SF)'"}, {"Match Index": "36", "Match Time": "09:50", "Match Set": "1 ", "Lane": "3 ", "Team Name": "廣林工程有限公司 ", "Qualifying Score": "2:08.44 ", "Match Score": "2:10.94 ", "Rank": "2 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟男子組半決賽成績表(SF)'"}, {"Match Index": "36", "Match Time": "09:50", "Match Set": "1 ", "Lane": "4 ", "Team Name": "鱷魚樹林 ", "Qualifying Score": "2:24.35 ", "Match Score": "2:36.16 ", "Rank": "4 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟男子組半決賽成績表(SF)'"}, {"Match Index": "37", "Match Time": "10:00", "Match Set": "2 ", "Lane": "1 ", "Team Name": "新北海山鯊魚 ", "Qualifying Score": "2:31.31 ", "Match Score": "2:29.79 ", "Rank": "4 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟男子組半決賽成績表(SF)'"}, {"Match Index": "37", "Match Time": "10:00", "Match Set": "2 ", "Lane": "2 ", "Team Name": "洲美傳承 ", "Qualifying Score": "2:12.82 ", "Match Score": "2:20.58 ", "Rank": "3 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟男子組半決賽成績表(SF)'"}, {"Match Index": "37", "Match Time": "10:00", "Match Set": "2 ", "Lane": "3 ", "Team Name": "南極冷凍 ", "Qualifying Score": "2:06.38 ", "Match Score": "2:12.87 ", "Rank": "1 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟男子組半決賽成績表(SF)'"}, {"Match Index": "37", "Match Time": "10:00", "Match Set": "2 ", "Lane": "4 ", "Team Name": "三M ", "Qualifying Score": "2:14.11 ", "Match Score": "2:14.96 ", "Rank": "2 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟男子組半決賽成績表(SF)'"}, 
+		{"Match Index": "38", "Match Time": "10:10", "Match Set": "3 ", "Lane": "1 ", "Team Name": "不老團隊 ", "Qualifying Score": "2:48.93 ", "Match Score": "xxxxxx ", "Rank": "5 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟男子組半決賽成績表(SF)'"}, {"Match Index": "38", "Match Time": "10:10", "Match Set": "5 ", "Lane": "3 ", "Team Name": "臺灣風暴男子隊 ", "Qualifying Score": "2:13.11", 
+		"Match Score": "2:27.41 ", "Rank": "3 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟男子組半決賽成績表(SF)'"}, 
+		{"Match Index": "38", "Match Time": "10:10", "Match Set": "3 ", "Lane": "3 ", "Team Name": "Mr.CaNoe_TAIWAN  ", "Qualifying Score": "2:04.99", "Match Score": "2:12.91 ", "Rank": "1", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟男子組半決賽成績表(SF)'"}, {"Match Index": "39", "Match Time": "10:30", "Match Set": "1 ", "Lane": "1 ", "Team Name": "法巴龍舟隊 ", "Qualifying Score": "2:33.55 ", "Match Score": "9:99.99 ", "Rank": "5 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽小型龍舟男子組決賽成績表(F)'"}, {"Match Index": "39", "Match Time": "10:30", "Match Set": "1 ", "Lane": "2 ", "Team Name": "SALAMA龍舟隊 ", "Qualifying Score": "2:29.39 ", "Match Score": "2:36.47 ", "Rank": "2 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽小型龍舟男子組決賽成績表(F)'"}, {"Match Index": "39", "Match Time": "10:30", "Match Set": "1 ", "Lane": "3 ", "Team Name": "真理大學 ", "Qualifying Score": "2:28.19 ", "Match Score": "2:32.95 ", "Rank": "1 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽小型龍舟男子組決賽成績表(F)'"}, {"Match Index": "39", "Match Time": "10:30", "Match Set": "1 ", "Lane": "4 ", "Team Name": "新北消防發爾麵 ", "Qualifying Score": "2:32.25 ", "Match Score": "2:38.35 ", "Rank": "3 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽小型龍舟男子組決賽成績表(F)'"}, {"Match Index": "40", "Match Time": "10:45", "Match Set": "2 ", "Lane": "1 ", "Team Name": "Wolf狼族 ", "Qualifying Score": "2:34.31 ", "Match Score": "2:38.63 ", "Rank": "4 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽小型龍舟男子組決賽成績表(F)'"}, {"Match Index": "40", "Match Time": "10:45", "Match Set": "2 ", "Lane": "2 ", "Team Name": "興隆模板 ", "Qualifying Score": "2:29.89 ", "Match Score": "2:34.75 ", "Rank": "3 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽小型龍舟男子組決賽成績表(F)'"}, {"Match Index": "40", "Match Time": "10:45", "Match Set": "2 ", "Lane": "3 ", "Team Name": "新北烏來龍舟隊 ", "Qualifying Score": "2:26.74 ", "Match Score": "2:31.40 ", "Rank": "1 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽小型龍舟男子組決賽成績表(F)'"}, {"Match Index": "40", "Match Time": "10:45", "Match Set": "2 ", "Lane": "4 ", "Team Name": "臺北市政府警察局U50 ", "Qualifying Score": "2:31.36 ", "Match Score": "2:33.06 ", "Rank": "2 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽小型龍舟男子組決賽成績表(F)'"}, {"Match Index": "41", "Match Time": "11:00", "Match Set": "1 ", "Lane": "1 ", "Team Name": "德倫思靈感龍 ", "Qualifying Score": "2:22.06 ", "Match Score": "2:20.95 ", "Rank": "3 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟混合組決賽成績表(F)'"}, {"Match Index": "41", "Match Time": "11:00", "Match Set": "1 ", "Lane": "2 ", "Team Name": "鳳凰水岸龍舟隊 ", "Qualifying Score": "2:20.17 ", "Match Score": "2:23.62 ", "Rank": "4 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟混合組決賽成績表(F)'"}, {"Match Index": "41", "Match Time": "11:00", "Match Set": "1 ", "Lane": "3 ", "Team Name": "Mapolong樹豆龍舟隊 ", "Qualifying Score": "2:18.25 ", "Match Score": "2:16.29 ", "Rank": "1 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟混合組決賽成績表(F)'"}, {"Match Index": "41", "Match Time": "11:00", "Match Set": "1 ", "Lane": "4 ", "Team Name": "TFA黑夜黑GoLiVen ", "Qualifying Score": "2:22.01 ", "Match Score": "2:17.78 ", "Rank": "2 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟混合組決賽成績表(F)'"}, {"Match Index": "42", "Match Time": "11:15", "Match Set": "2 ", "Lane": "1 ", "Team Name": "兩成肆就捌 ", "Qualifying Score": "2:24.36 ", "Match Score": "2:27.35 ", "Rank": "3 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟混合組決賽成績表(F)'"}, {"Match Index": "42", "Match Time": "11:15", "Match Set": "2 ", "Lane": "2 ", "Team Name": "宇宙飛船_Rowvolution ", "Qualifying Score": "2:21.24 ", "Match Score": "2:23.84 ", "Rank": "2 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟混合組決賽成績表(F)'"}, {"Match Index": "42", "Match Time": "11:15", "Match Set": "2 ", "Lane": "3 ", "Team Name": "阿美青年跩根隊 ", "Qualifying Score": "2:14.96 ", "Match Score": "2:18.60 ", "Rank": "1 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟混合組決賽成績表(F)'"}, {"Match Index": "42", "Match Time": "11:15", "Match Set": "2 ", "Lane": "4 ", "Team Name": "創友一條龍 ", "Qualifying Score": "2:21.52 ", "Match Score": "2:27.90 ", "Rank": "4 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟混合組決賽成績表(F)'"}, {"Match Index": "43", "Match Time": "11:30", "Match Set": "1 ", "Lane": "1 ", "Team Name": "洲美傳承 ", "Qualifying Score": "2:20.58 ", "Match Score": "2:18.85 ", "Rank": "4 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟男子組決賽成績表(F)'"}, {"Match Index": "43", "Match Time": "11:30", "Match Set": "1 ", "Lane": "2 ", "Team Name": "南極冷凍 ", "Qualifying Score": "2:12.87 ", "Match Score": "2:13.08 ", "Rank": "2 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟男子組決賽成績表(F)'"}, {"Match Index": "43", "Match Time": "11:30", "Match Set": "1 ", "Lane": "3 ", "Team Name": "廣林工程有限公司 ", "Qualifying Score": "2:10.94 ", "Match Score": "2:12.21 ", "Rank": "1 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟男子組決賽成績表(F)'"}, {"Match Index": "43", "Match Time": "11:30", "Match Set": "1 ", "Lane": "4 ", "Team Name": "新北市政府消防局 ", "Qualifying Score": "2:15.29 ", "Match Score": "2:14.73 ", "Rank": "3 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟男子組決賽成績表(F)'"}, {"Match Index": "44", "Match Time": "11:45", "Match Set": "2 ", "Lane": "1 ", "Team Name": "臺灣風暴男子隊 ", "Qualifying Score": "2:27.41 ", "Match Score": "9:99.99 ", "Rank": "5 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟男子組決賽成績表(F)'"}, {"Match Index": "44", "Match Time": "11:45", "Match Set": "2 ", "Lane": "2 ", "Team Name": "Mr.CaNoe_TAIWAN ", "Qualifying Score": "2:12.91 ", "Match Score": "2:07.64 ", "Rank": "1 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟男子組決賽成績表(F)'"}, {"Match Index": "44", "Match Time": "11:45", "Match Set": "2 ", "Lane": "3 ", "Team Name": "新莊實業熊鷹 ", "Qualifying Score": "2:10.51 ", "Match Score": "2:11.66 ", "Rank": "2 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟男子組決賽成績表(F)'"}, {"Match Index": "44", "Match Time": "11:45", "Match Set": "2 ", "Lane": "4 ", "Team Name": "三M ", "Qualifying Score": "2:14.96 ", "Match Score": "2:24.18 ", "Rank": "3 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟男子組決賽成績表(F)'"}, {"Match Index": "45", "Match Time": "12:40", "Match Set": "1 ", "Lane": "1 ", "Team Name": "qaris熊鷹女子隊 ", "Qualifying Score": "02:44.15 ", "Match Score": "2:46.93 ", "Rank": "3 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽小型龍舟女子組總決賽成績表(GF)'"}, {"Match Index": "45", "Match Time": "12:40", "Match Set": "1 ", "Lane": "2 ", "Team Name": "銘傳旭源獨角鯨 ", "Qualifying Score": "02:41.38 ", "Match Score": "2:44.90 ", "Rank": "2 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽小型龍舟女子組總決賽成績表(GF)'"}, {"Match Index": "45", "Match Time": "12:40", "Match Set": "1 ", "Lane": "3 ", "Team Name": "臺灣勇豹龍舟隊 ", "Qualifying Score": "02:28.76 ", "Match Score": "2:34.27 ", "Rank": "1 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽小型龍舟女子組總決賽成績表(GF)'"}, {"Match Index": "45", "Match Time": "12:40", "Match Set": "1 ", "Lane": "4 ", "Team Name": "碧潭女聯 ", "Qualifying Score": "02:43.63 ", "Match Score": "9:99.99 ", "Rank": "5 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽小型龍舟女子組總決賽成績表(GF)'"}, {"Match Index": "46", "Match Time": "13:00", "Match Set": "1 ", "Lane": "2 ", "Team Name": "北消防發爾麵 ", "Qualifying Score": "2:38.35 ", "Match Score": "2:34.41 ", "Rank": "2 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽小型龍舟男子組總決賽成績表(GF)'"}, {"Match Index": "46", "Match Time": "13:00", "Match Set": "1 ", "Lane": "3 ", "Team Name": "興隆模板 ", "Qualifying Score": "2:34.75 ", "Match Score": "2:33.64 ", "Rank": "1 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽小型龍舟男子組總決賽成績表(GF)'"}, {"Match Index": "46", "Match Time": "13:00", "Match Set": "1 ", "Lane": "4 ", "Team Name": "Wolf狼族 ", "Qualifying Score": "2:38.63 ", "Match Score": "2:35.16 ", "Rank": "3 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽小型龍舟男子組總決賽成績表(GF)'"}, {"Match Index": "47", "Match Time": "13:20", "Match Set": "2 ", "Lane": "1 ", "Team Name": "SALAMA龍舟隊 ", "Qualifying Score": "2:36.47 ", "Match Score": "2:30.28 ", "Rank": "4 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽小型龍舟男子組總決賽成績表(GF)'"}, {"Match Index": "47", "Match Time": "13:20", "Match Set": "2 ", "Lane": "2 ", "Team Name": "新北消防發爾麵 ", "Qualifying Score": "2:38.35 ", "Match Score": "2:22.94 ", "Rank": "1 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽小型龍舟男子組總決賽成績表(GF)'"}, {"Match Index": "47", "Match Time": "13:20", "Match Set": "2 ", "Lane": "3 ", "Team Name": "Wolf狼族 ", "Qualifying Score": "2:38.63 ", "Match Score": "2:23.72 ", "Rank": "2 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽小型龍舟男子組總決賽成績表(GF)'"}, {"Match Index": "47", "Match Time": "13:20", "Match Set": "2 ", "Lane": "4 ", "Team Name": "臺北市政府警察局U50 ", "Qualifying Score": "2:33.06 ", "Match Score": "2:30.04 ", "Rank": "3 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽小型龍舟男子組總決賽成績表(GF)'"}, {"Match Index": "48", "Match Time": "13:40", "Match Set": "1 ", "Lane": "1 ", "Team Name": "創友一條龍 ", "Qualifying Score": "2:27.90 ", "Match Score": "2:36.63 ", "Rank": "4 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟混合組總決賽成績表(GF)'"}, {"Match Index": "48", "Match Time": "13:40", "Match Set": "1 ", "Lane": "2 ", "Team Name": "鳳凰水岸龍舟隊 ", "Qualifying Score": "2:23.62 ", "Match Score": "2:30.35 ", "Rank": "3 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟混合組總決賽成績表(GF)'"}, {"Match Index": "48", "Match Time": "13:40", "Match Set": "1 ", "Lane": "3 ", "Team Name": "德倫思靈感龍 ", "Qualifying Score": "2:20.95 ", "Match Score": "2:22.89 ", "Rank": "2 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟混合組總決賽成績表(GF)'"}, {"Match Index": "48", "Match Time": "13:40", "Match Set": "1 ", "Lane": "4 ", "Team Name": "兩成肆就捌 ", "Qualifying Score": "2:27.35 ", "Match Score": "2:22.18 ", "Rank": "1 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟混合組總決賽成績表(GF)'"}, {"Match Index": "49", "Match Time": "14:00", "Match Set": "1 ", "Lane": "2 ", "Team Name": "洲美傳承 ", "Qualifying Score": "2:18.85 ", "Match Score": "2:21.30 ", "Rank": "2 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟男子組總決賽成績表(GF)'"}, {"Match Index": "49", "Match Time": "14:00", "Match Set": "1 ", "Lane": "3 ", "Team Name": "新北市政府消防局 ", "Qualifying Score": "2:14.73 ", "Match Score": "2:15.86 ", "Rank": "1 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟男子組總決賽成績表(GF)'"}, {"Match Index": "49", "Match Time": "14:00", "Match Set": "1 ", "Lane": "4 ", "Team Name": "三M ", "Qualifying Score": "2:24.18 ", "Match Score": "9:99.99 ", "Rank": "5 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟男子組總決賽成績表(GF)'"}, {"Match Index": "50", "Match Time": "14:20", "Match Set": "2 ", "Lane": "1 ", "Team Name": "宇宙飛船_Rowvolution ", "Qualifying Score": "2:23.84 ", "Match Score": "2:21.18 ", "Rank": "3 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟混合組總決賽成績表(GF)'"}, {"Match Index": "50", "Match Time": "14:20", "Match Set": "2 ", "Lane": "2 ", "Team Name": "TFA黑夜黑GoLiVen ", "Qualifying Score": "2:17.78 ", "Match Score": "2:21.81 ", "Rank": "4 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟混合組總決賽成績表(GF)'"}, {"Match Index": "50", "Match Time": "14:20", "Match Set": "2 ", "Lane": "3 ", "Team Name": "Mapolong樹豆龍舟隊 ", "Qualifying Score": "2:16.29 ", "Match Score": "2:15.76 ", "Rank": "2 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟混合組總決賽成績表(GF)'"}, {"Match Index": "50", "Match Time": "14:20", "Match Set": "2 ", "Lane": "4 ", "Team Name": "阿美青年跩根隊 ", "Qualifying Score": "2:18.60 ", "Match Score": "2:14.35 ", "Rank": "1 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟混合組總決賽成績表(GF)'"}, {"Match Index": "51", "Match Time": "14:40", "Match Set": "1 ", "Lane": "1 ", "Team Name": "SBT女子龍舟隊 ", "Qualifying Score": "2:35.66 ", "Match Score": "9:99.99 ", "Rank": "5 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟女子組總決賽成績表(GF)'"}, {"Match Index": "51", "Match Time": "14:40", "Match Set": "1 ", "Lane": "2 ", "Team Name": "臺灣風暴龍舟隊 ", "Qualifying Score": "2:21.81 ", "Match Score": "2:37.17 ", "Rank": "2 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟女子組總決賽成績表(GF)'"}, {"Match Index": "51", "Match Time": "14:40", "Match Set": "1 ", "Lane": "3 ", "Team Name": "台北霞海城隍廟 ", "Qualifying Score": "2:21.52 ", "Match Score": "2:26.73 ", "Rank": "1 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟女子組總決賽成績表(GF)'"}, {"Match Index": "51", "Match Time": "14:40", "Match Set": "1 ", "Lane": "4 ", "Team Name": "M三 ", "Qualifying Score": "2:30.25 ", "Match Score": "2:39.17 ", "Rank": "3 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟女子組總決賽成績表(GF)'"}, {"Match Index": "52", "Match Time": "15:00", "Match Set": "2 ", "Lane": "1 ", "Team Name": "南極冷凍 ", "Qualifying Score": "2:13.08 ", "Match Score": "2:10.83 ", "Rank": "4 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟男子組總決賽成績表(GF)'"}, {"Match Index": "52", "Match Time": "15:00", "Match Set": "2 ", "Lane": "2 ", "Team Name": "新莊實業熊鷹 ", "Qualifying Score": "2:11.66 ", "Match Score": "2:09.56 ", "Rank": "3 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟男子組總決賽成績表(GF)'"}, {"Match Index": "52", "Match Time": "15:00", "Match Set": "2 ", "Lane": "3 ", "Team Name": "Mr.CaNoe_TAIWAN ", "Qualifying Score": "2:07.64 ", "Match Score": "2:05.21 ", "Rank": "1 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟男子組總決賽成績表(GF)'"}, {"Match Index": "52", "Match Time": "15:00", "Match Set": "2 ", "Lane": "4 ", "Team Name": "廣林工程有限公司 ", "Qualifying Score": "2:12.21 ", "Match Score": "2:06.12 ", "Rank": "2 ", "Match Name": "新北市議長盃第十六屆龍舟錦標賽大型龍舟男子組總決賽成績表(GF)'"}];
+        
+        // ===== 全局變數 =====
+        let filteredData = [];
+        let currentSortColumn = null;
+        let currentSortDirection = 'asc';
+
+        // 初始化
+        function initialize() {
+            filteredData = [...allData];
+            updateStats();
+            renderTable();
+        }
+
+        // 過濾數據
+        function filterData() {
+            const filterText = document.getElementById('filterInput').value.toLowerCase().trim();
+            
+            if (!filterText) {
+                filteredData = [...allData];
+            } else {
+                filteredData = allData.filter(row => {
+                    return Object.values(row).some(value => 
+                        String(value).toLowerCase().includes(filterText)
+                    );
+                });
+            }
+            
+            updateStats();
+            renderTable();
+        }
+
+        // 排序表格
+        function sortTable(column) {
+            if (currentSortColumn === column) {
+                currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSortColumn = column;
+                currentSortDirection = 'asc';
+            }
+            
+            filteredData.sort((a, b) => {
+                let aValue = a[column] || '';
+                let bValue = b[column] || '';
+                
+                // 嘗試轉換為數字進行比較
+                const aNum = parseFloat(aValue);
+                const bNum = parseFloat(bValue);
+                
+                if (!isNaN(aNum) && !isNaN(bNum)) {
+                    return currentSortDirection === 'asc' ? aNum - bNum : bNum - aNum;
+                }
+                
+                // 字符串比較
+                aValue = String(aValue).toLowerCase();
+                bValue = String(bValue).toLowerCase();
+                
+                if (currentSortDirection === 'asc') {
+                    return aValue.localeCompare(bValue, 'zh');
+                } else {
+                    return bValue.localeCompare(aValue, 'zh');
+                }
+            });
+            
+            renderTable();
+            updateSortIndicators();
+        }
+
+        // 更新排序指示器
+        function updateSortIndicators() {
+            document.querySelectorAll('th').forEach((th, index) => {
+                th.classList.remove('sorted-asc', 'sorted-desc');
+            });
+            
+            if (currentSortColumn) {
+                const headers = ['Match Index', 'Match Time', 'Match Set', 'Lane', 'Team Name', 'Qualifying Score', 'Match Score', 'Rank', 'Match Name'];
+                const index = headers.indexOf(currentSortColumn);
+                if (index !== -1) {
+                    document.querySelectorAll('th')[index].classList.add(`sorted-${currentSortDirection}`);
+                }
+            }
+        }
+
+        // 渲染表格
+        function renderTable() {
+            const tableBody = document.getElementById('tableBody');
+            const noData = document.getElementById('noData');
+            
+            if (filteredData.length === 0) {
+                tableBody.innerHTML = '';
+                noData.style.display = 'block';
+                return;
+            }
+            
+            noData.style.display = 'none';
+            tableBody.innerHTML = filteredData.map(row => `
+                <tr>
+                    <td>${row['Match Index'] || '-'}</td>
+                    <td class="time-cell">${row['Match Time'] || '-'}</td>
+                    <td>${row['Match Set'] || '-'}</td>
+                    <td>${row['Lane'] || '-'}</td>
+                    <td><strong>${row['Team Name'] || '-'}</strong></td>
+                    <td>${row['Qualifying Score'] || '-'}</td>
+                    <td class="time-cell">${row['Match Score'] || '-'}</td>
+                    <td class="rank-cell">${row['Rank'] || '-'}</td>
+                    <td>${row['Match Name'] || '-'}</td>
+                </tr>
+            `).join('');
+        }
+
+        // 更新統計信息
+        function updateStats() {
+            document.getElementById('totalCount').textContent = allData.length;
+            document.getElementById('showCount').textContent = filteredData.length;
+        }
+
+        // 事件監聽器
+        document.getElementById('filterInput').addEventListener('input', filterData);
+
+        // 页面加载完成后初始化
+        window.addEventListener('DOMContentLoaded', initialize);
+    </script>
+</body>
+</html>
